@@ -1,0 +1,60 @@
+/*
+ * config_cmac.c
+ *
+ *  Created on: Feb 15, 2026
+ *      Author: HP
+ */
+
+#include "config_cmac.h"
+#include "cmox_cmac.h"
+#include "legacy_v3_cmac.h"
+#include "stm32f4xx_hal.h"
+#include <string.h>
+
+// ---------- Firmware Key ----------
+const uint8_t FW_AES_KEY[AES_KEY_SIZE] = {
+    0x12, 0x34, 0x56, 0x78,
+    0x9A, 0xBC, 0xDE, 0xF0,
+    0x11, 0x22, 0x33, 0x44,
+    0x55, 0x66, 0x77, 0x88
+};
+
+// ---------- CMAC Verification ----------
+uint8_t Verify_Firmware_CMAC(uint32_t flash_address, uint32_t firmware_size)
+{
+    AESCMACctx_stt cmac_ctx;
+    uint8_t computed_tag[AES_CMAC_TAG_SIZE];
+    int32_t output_size = 0;
+    uint8_t *firmware_ptr = (uint8_t*)flash_address;
+
+    // --- Initialize CMAC context ---
+    cmac_ctx.pmKey      = FW_AES_KEY;
+    cmac_ctx.mKeySize   = AES_KEY_SIZE;
+    cmac_ctx.mTagSize   = AES_CMAC_TAG_SIZE;
+    cmac_ctx.mFlags     = E_SK_DEFAULT;
+
+    if (AES_CMAC_Encrypt_Init(&cmac_ctx) != AES_SUCCESS)
+        goto cmac_error;
+
+    // --- Compute CMAC over the firmware ---
+    if (AES_CMAC_Encrypt_Append(&cmac_ctx, firmware_ptr, firmware_size) != AES_SUCCESS)
+    	goto cmac_error;
+
+    if (AES_CMAC_Encrypt_Finish(&cmac_ctx, computed_tag, &output_size) != AES_SUCCESS)
+    	goto cmac_error;
+
+    // --- Compare with stored tag at end of firmware ---
+    uint8_t *stored_tag = firmware_ptr + (firmware_size - AES_CMAC_TAG_SIZE);
+
+    if (memcmp(computed_tag, stored_tag, AES_CMAC_TAG_SIZE) != 0)
+        goto cmac_error;
+
+    // Firmware OK → just return
+    return;
+
+
+    cmac_error:
+
+        UART_SendBuffer((uint8_t*)"\r\nFW INVALID OR CORRUPTED!\r\n", 27);
+}
+

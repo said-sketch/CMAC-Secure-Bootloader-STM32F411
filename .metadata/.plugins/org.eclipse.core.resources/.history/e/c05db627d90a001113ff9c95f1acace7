@@ -1,0 +1,147 @@
+/*
+ * xmodem.c
+ *
+ *  Created on: Feb 9, 2026
+ *      Author: HP
+ */
+
+#include "xmodem.h"
+#include "uart.h"
+#include "flash_if.h"
+#include <string.h>
+#include <stdio.h>
+
+#define XMODEM_USE_CHECKSUM 1
+
+static uint8_t xmodem_data_buf[XMODEM_PACKET_1K];
+
+uint8_t XMODEM_CalcChecksum(const uint8_t *data, uint16_t length)
+{
+    uint8_t sum = 0;
+    for (uint16_t i = 0; i < length; i++)
+        sum += data[i];
+    return sum;
+}
+
+static XMODEM_Status_t XMODEM_ReceivePacket(uint8_t *packet_no, uint16_t *packet_size)
+{
+    uint8_t header, pkt_no, pkt_no_inv;
+
+    if (UART_ReceiveByte(&header) != UART_OK)
+        return XMODEM_TIMEOUT_ERROR;
+
+    if (header == EOT)
+        return XMODEM_EOT_RECEIVED;
+
+    if (header == SOH)
+        *packet_size = XMODEM_PACKET_128;
+    else if (header == STX)
+        *packet_size = XMODEM_PACKET_1K;
+    else
+        return XMODEM_UART_ERROR;
+
+    if (UART_ReceiveByte(&pkt_no) != UART_OK) return XMODEM_TIMEOUT_ERROR;
+    if (UART_ReceiveByte(&pkt_no_inv) != UART_OK) return XMODEM_TIMEOUT_ERROR;
+
+    if ((pkt_no ^ pkt_no_inv) != 0xFF) return XMODEM_PACKET_NUM_ERROR;
+
+    if (UART_ReceiveBuffer(xmodem_data_buf, *packet_size, XMODEM_BYTE_TIMEOUT) != UART_OK)
+        return XMODEM_TIMEOUT_ERROR;
+
+#if XMODEM_USE_CHECKSUM
+    uint8_t recv_checksum;
+    if (UART_ReceiveByte(&recv_checksum) != UART_OK) return XMODEM_TIMEOUT_ERROR;
+
+    if (recv_checksum != XMODEM_CalcChecksum(xmodem_data_buf, *packet_size))
+        return XMODEM_CRC_ERROR;
+#else
+    // CRC16 code if needed
+#endif
+
+    *packet_no = pkt_no;
+    return XMODEM_OK;
+}
+
+XMODEM_Status_t XMODEM_Receive(uint32_t flash_start_addr, uint32_t max_size)
+{
+    uint8_t expected_packet = 1;
+    uint32_t flash_addr = flash_start_addr;
+    uint32_t received_size = 0;
+    uint8_t packet_no;
+    uint16_t packet_size;
+    XMODEM_Status_t status;
+
+    /* Request checksum mode (Tera Term default) */
+#if XMODEM_USE_CHECKSUM
+    UART_SendByte(NAK);
+#else
+    UART_SendByte(CRC_REQ);
+#endif
+
+    /* Erase application flash */
+    if (Flash_Erase(flash_start_addr) != FLASH_OK)
+    {
+        UART_SendString((uint8_t*)"FLASH ERASE FAIL\r\n");
+        return XMODEM_FLASH_ERROR;
+    }
+
+    while (1)
+    {
+        status = XMODEM_ReceivePacket(&packet_no, &packet_size);
+
+        if (status == XMODEM_OK)
+        {
+            if (packet_no == expected_packet)
+            {
+                // Check total size
+                if ((received_size + packet_size) > max_size)
+                {
+                    UART_SendByte(CAN);
+
+                    return XMODEM_SIZE_ERROR;
+                }
+
+                // Write to flash
+                if (Flash_Write(flash_addr, xmodem_data_buf, packet_size) != FLASH_OK)
+                {
+                    UART_SendByte(CAN);
+
+                    return XMODEM_FLASH_ERROR;
+                }
+
+                flash_addr    += packet_size;
+                received_size += packet_size;
+                expected_packet++;
+
+                // Optional debug for received bytes
+                char dbg[50];
+                sprintf(dbg, "RX %lu bytes\r\n", received_size);
+                UART_SendString((uint8_t*)dbg);
+            }
+
+            UART_SendByte(ACK);
+        }
+        else if (status == XMODEM_EOT_RECEIVED)
+        {
+            UART_SendByte(ACK);
+            break;
+        }
+        else
+        {
+            UART_SendByte(NAK);
+        }
+    }
+
+    // Optional: final confirmation
+    char done_msg[60];
+    snprintf(done_msg, sizeof(done_msg),
+             "XMODEM DONE: %lu bytes received\r\n",
+             received_size);
+
+    UART_SendString((uint8_t*)done_msg);
+
+    return XMODEM_OK;
+}
+
+
+

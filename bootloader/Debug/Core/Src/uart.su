@@ -1,0 +1,4 @@
+uart.c:14:13:UART_SendString	24	static
+uart.c:25:13:UART_SendByte	16	static
+uart.c:33:13:UART_ReceiveByte	16	static
+uart.c:42:13:UART_ReceiveBuffer	24	static

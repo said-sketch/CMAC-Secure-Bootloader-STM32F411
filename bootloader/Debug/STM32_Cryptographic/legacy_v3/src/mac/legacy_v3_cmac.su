@@ -1,0 +1,6 @@
+legacy_v3_cmac.c:24:9:AES_CMAC_Encrypt_Init	24	static
+legacy_v3_cmac.c:70:9:AES_CMAC_Encrypt_Append	32	static
+legacy_v3_cmac.c:111:9:AES_CMAC_Encrypt_Finish	40	static
+legacy_v3_cmac.c:155:9:AES_CMAC_Decrypt_Init	16	static
+legacy_v3_cmac.c:161:9:AES_CMAC_Decrypt_Append	24	static
+legacy_v3_cmac.c:169:9:AES_CMAC_Decrypt_Finish	32	static

@@ -1,0 +1,31 @@
+/*
+ * config_cmac.h
+ *
+ *  Created on: Feb 15, 2026
+ *      Author: HP
+ */
+
+#ifndef INC_CONFIG_CMAC_H_
+#define INC_CONFIG_CMAC_H_
+
+#include "legacy_v3_cmac.h"
+
+// ---------- Configuration constants ----------
+#define AES_KEY_SIZE       		16   // 128-bit AES key
+#define AES_CMAC_TAG_SIZE  		16   // CMAC tag size (in bytes)
+#define APP_FLASH_ADDRESS       ((uint32_t)0x08020000u)
+#define APP_FLASH_END_ADDRESS   ((uint32_t)APP_FLASH_ADDRESS+ 64*1024) // Maximum size of the App is 64k - From Page 64 to 96
+#define APP_FLASH_SIZE 			APP_FLASH_END_ADDRESS - APP_FLASH_ADDRESS
+// ---------- Firmware Key (must match the one used for app CMAC generation) ----------
+extern const uint8_t FW_AES_KEY[AES_KEY_SIZE];
+
+// ---------- CMAC Verification Function ----------
+/**
+ * @brief Verify firmware using CMAC
+ * @param flash_address   Start address of the firmware in flash
+ * @param firmware_size   Size of the firmware in bytes
+ * @return 1 if firmware is valid, 0 if invalid
+ */
+uint8_t Verify_Firmware_CMAC(uint32_t flash_address, uint32_t firmware_size);
+
+#endif /* INC_CONFIG_CMAC_H_ */

@@ -1,0 +1,50 @@
+/*
+ * uart.c
+ *
+ *  Created on: Feb 13, 2026
+ *      Author: HP
+ */
+#include "uart.h"
+#include "stm32f4xx_hal.h"
+
+
+UART_HandleTypeDef huart2;
+
+
+uart_status UART_SendString(uint8_t *str)
+{
+    uint16_t len = 0;
+    while (str[len] != '\0') len++;
+    if (HAL_UART_Transmit(&huart2, str, len, 100) == HAL_OK)
+        return UART_OK;
+    else
+        return UART_ERROR;
+}
+/* ================= SEND SINGLE BYTE ================= */
+
+uart_status UART_SendByte(uint8_t byte)
+{
+    if (HAL_UART_Transmit(&huart2, &byte, 1, HAL_MAX_DELAY) == HAL_OK)
+        return UART_OK;
+
+    return UART_ERROR;
+}
+
+uart_status UART_ReceiveByte(uint8_t *data)
+{
+    if (HAL_UART_Receive(&huart2, data, 1, 100) == HAL_OK)
+        return UART_OK;
+    else
+        return UART_ERROR;
+}
+
+/* ================= RECEIVE BUFFER ================= */
+uart_status UART_ReceiveBuffer(uint8_t *buf, uint16_t len, uint32_t timeout)
+{
+    if (!buf) return UART_ERROR;
+    if (HAL_UART_Receive(&huart2, buf, len, timeout) == HAL_OK)
+        return UART_OK;
+    else
+        return UART_TIMEOUT;
+}
+

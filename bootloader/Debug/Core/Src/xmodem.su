@@ -1,0 +1,3 @@
+xmodem.c:18:9:XMODEM_CalcChecksum	24	static
+xmodem.c:26:24:XMODEM_ReceivePacket	24	static
+xmodem.c:65:17:XMODEM_Receive	152	static
